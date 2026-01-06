@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# PyTorch Model Weights
+assets/*.pth
+
+# Generated Plots
+assets/*_loss.png
+assets/*_accuracy.png
+
+# LaTeX Build Artifacts
+out/*.aux
+out/*.log
+out/*.out
+out/*.toc
+out/*.synctex.gz
+
+# IDE
+.idea/
+
+# macOS
+.DS_Store
