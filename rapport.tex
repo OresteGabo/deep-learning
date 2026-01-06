@@ -1,0 +1,184 @@
+\documentclass[12pt,a4paper]{article}
+
+% --- Paquets standard ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{setspace}
+
+\geometry{margin=2.5cm}
+\onehalfspacing
+
+% --- Configuration de l'affichage du code Python ---
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstset{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single
+}
+
+\newcommand{\hr}[1]{\rule{\linewidth}{#1}}
+
+% --- Début du document ---
+\begin{document}
+
+% --- PAGE DE GARDE ---
+\begin{titlepage}
+    \begin{center}
+        \includegraphics[width=0.4\textwidth]{assets/logo.png}\\[1cm]
+
+        \textsc{\Large Université de Haute-Alsace}\\[0.5cm]
+        \textsc{\large Faculté des Sciences et Techniques (FST)}\\[0.5cm]
+        \textsc{\large Master 2 Informatique et Mobilité}\\[1.5cm]
+
+        \hr{0.5pt}
+        \vspace{0.4cm}
+        {\huge \bfseries Projet Final : Apprentissage Profond} \\[0.4cm]
+        {\Large Détection d'événements sismologiques majeurs}
+        \vspace{0.4cm}
+        \hr{0.5pt}
+
+        \vspace{2cm}
+
+        \begin{minipage}{0.45\textwidth}
+            \begin{flushleft} \large
+                \emph{Auteur :}\\
+                \textbf{Oreste MUHIRWA GABO}\\
+                \texttt{orestegabo@icloud.com}
+            \end{flushleft}
+        \end{minipage}
+        \hfill
+        \begin{minipage}{0.45\textwidth}
+            \begin{flushright} \large
+                \emph{Enseignant :}\\
+                M. Maxime DEVANNE \\
+                Responsable Deep Learning
+            \end{flushright}
+        \end{minipage}
+
+        \vfill
+
+        {\large 16 Janvier 2025}
+    \end{center}
+\end{titlepage}
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduction}
+Ce projet répond à une problématique du centre sismologique : automatiser la détection d'événements majeurs (séismes, éruptions) à partir de séries temporelles de 512 heures. L'objectif est de remplacer l'analyse visuelle chronophage par des modèles de Deep Learning capables de traiter plusieurs relevés par minute, tout en restant compatibles avec des infrastructures matérielles modestes.
+
+\section{Architectures et Motivations}
+Nous avons implémenté trois types de réseaux, chacun répondant à une approche différente du signal :
+\begin{itemize}
+    \item \textbf{MLP (Multi-Layer Perceptron) :} Utilisé comme référence pour sa simplicité. Il traite les 512 points comme des variables indépendantes.
+    \item \textbf{CNN (Convolutional Neural Network) :} Conçu pour extraire des motifs locaux (pics sismologiques) grâce à des filtres convolutionnels 1D.
+    \item \textbf{RNN (LSTM) :} Choisi pour sa capacité à mémoriser les dépendances temporelles longues, cruciales pour l'évolution d'un signal sismique sur 512 heures.
+\end{itemize}
+
+\section{Analyse Détaillée des Performances}
+
+\subsection{Multi-Layer Perceptron (MLP)}
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \centering \includegraphics[width=\textwidth]{assets/MLP_loss.png}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering \includegraphics[width=\textwidth]{assets/MLP_accuracy.png}
+    \end{minipage}
+    \caption{Résultats MLP : Surapprentissage précoce marqué par une chute de la perte mais une instabilité de la précision test.}
+\end{figure}
+
+\subsection{Convolutional Neural Network (CNN)}
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \centering \includegraphics[width=\textwidth]{assets/CNN_loss.png}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering \includegraphics[width=\textwidth]{assets/CNN_accuracy.png}
+    \end{minipage}
+    \caption{Résultats CNN : Plateau horizontal à 74.82\%, indiquant que le modèle se limite à prédire la classe majoritaire.}
+\end{figure}
+
+\subsection{Recurrent Neural Network (RNN)}
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \centering \includegraphics[width=\textwidth]{assets/RNN_loss.png}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering \includegraphics[width=\textwidth]{assets/RNN_accuracy.png}
+    \end{minipage}
+    \caption{Résultats RNN : Meilleur modèle (76.98\%), capable de surpasser le biais statistique.}
+\end{figure}
+
+\section{Étude de Complexité et Robustesse}
+Conformément aux contraintes du service sismologique, nous avons mesuré l'efficacité de nos modèles.
+
+\textbf{Environnement d'exécution :} MacBook Pro M4 (16GB RAM), macOS Tahoe 26.1, accélération MPS (Metal).
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Modèle} & \textbf{Paramètres} & \textbf{Inférence (s)} & \textbf{Meilleure Acc.} \\
+        \midrule
+        MLP & 74,050 & \textbf{0.0014s} & 74.82\% \\
+        CNN & \textbf{43,842} & 0.0092s & 74.82\% \\
+        RNN & 50,562 & 0.0047s & \textbf{76.98\%} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Comparaison technique des architectures.}
+\end{table}
+
+\textbf{Robustesse :} Nous avons intégré un \textit{Learning Rate Scheduler} (\texttt{ReduceLROnPlateau}) et du \textit{Dropout} (0.2/0.3) pour garantir que les performances ne sont pas dues à un simple surapprentissage mais à une réelle généralisation des signaux.
+
+\section{Conclusion}
+Le modèle \textbf{RNN (LSTM)} est recommandé pour sa précision supérieure. Bien que plus lent à l'inférence que le MLP, il reste largement sous le seuil d'une seconde, garantissant sa viabilité sur les PCs du service de sismologie.
+
+\newpage
+\section{Annexes : Code Principal}
+\begin{lstlisting}[language=Python, caption=Architecture RNN finale]
+class EarthquakeRNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lstm = nn.LSTM(input_size=1, hidden_size=64,
+                            num_layers=2, batch_first=True)
+        self.fc = nn.Linear(64, 2)
+
+    def forward(self, x):
+        x = x.unsqueeze(-1)
+        _, (hn, _) = self.lstm(x)
+        return self.fc(hn[-1])
+\end{lstlisting}
+
+\end{document}
