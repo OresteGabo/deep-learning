@@ -1,7 +1,15 @@
 import torch
 import time
-import matplotlib.pyplot as plt
 import os
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def print_detailed_report(y_true, y_pred):
+    print("\n--- Confusion Matrix ---")
+    print(confusion_matrix(y_true, y_pred))
+    print("\n--- Classification Report ---")
+    print(classification_report(y_true, y_pred, target_names=['Normal', 'Earthquake']))
 
 def measure_complexity(model, input_size=(1, 512)):
     device = next(model.parameters()).device
