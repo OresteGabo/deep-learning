@@ -1,26 +1,37 @@
 import torch
 import torch.nn as nn
+import torch.optim as optim
 from utils.data_loader import get_dataloaders
-from utils.metrics import measure_complexity, plot_training_results
+from utils.metrics import measure_complexity, plot_training_results, print_detailed_report
 
-# Direct imports from the individual model files
+# Model imports
 from models.mlp import EarthquakeMLP
 from models.cnn import EarthquakeCNN
 from models.rnn import EarthquakeRNN
+from models.hybrid import SeismicNet  # Your new Hybrid model
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 num_epochs = 100
 
+
 def run_experiment(model_class, name, train_loader, test_loader):
     model = model_class().to(device)
 
-    # We use a slightly lower learning rate for CNN/RNN to avoid the "straight line" trap
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4)
+    # 1. WEIGHTED LOSS: Address class imbalance (approx 3:1 ratio)
+    # This forces the model to care more about the minority 'Earthquake' class
+    weights = torch.tensor([1.0, 3.0]).to(device)
+    criterion = nn.CrossEntropyLoss(weight=weights)
 
-    # Scheduler: Reduces learning rate if the loss stops improving
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, factor=0.5)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 
-    criterion = nn.CrossEntropyLoss()
+    # 2. ONECYCLE LR: Helps escape local minima (the 74% trap)
+    # It starts low, ramps up, then cools down.
+    scheduler = optim.lr_scheduler.OneCycleLR(
+        optimizer,
+        max_lr=0.005,
+        steps_per_epoch=len(train_loader),
+        epochs=num_epochs
+    )
 
     params, inf_time = measure_complexity(model)
     print(f"\n--- Starting Experiment: {name} ---")
@@ -36,35 +47,37 @@ def run_experiment(model_class, name, train_loader, test_loader):
         for X, y in train_loader:
             X, y = X.to(device), y.to(device)
 
-            # OPTIONAL: Standardize X on the fly if not done in data_loader
-            # X = (X - X.mean()) / (X.std() + 1e-6)
-
             optimizer.zero_grad()
             outputs = model(X)
             loss = criterion(outputs, y)
             loss.backward()
             optimizer.step()
+
+            # Step OneCycleLR after every batch
+            scheduler.step()
+
             running_loss += loss.item()
 
         avg_loss = running_loss / len(train_loader)
         epoch_losses.append(avg_loss)
 
-        # Step the scheduler
-        scheduler.step(avg_loss)
-
         # Evaluation
         model.eval()
-        correct = 0
-        total = 0
+        all_preds = []
+        all_labels = []
+
         with torch.no_grad():
             for X, y in test_loader:
                 X, y = X.to(device), y.to(device)
                 outputs = model(X)
                 preds = outputs.argmax(1)
-                correct += (preds == y).sum().item()
-                total += y.size(0)
 
-        accuracy = 100 * correct / total
+                all_preds.extend(preds.cpu().numpy())
+                all_labels.extend(y.cpu().numpy())
+
+        # Calculate Accuracy
+        correct = sum([1 for p, l in zip(all_preds, all_labels) if p == l])
+        accuracy = 100 * correct / len(all_labels)
         epoch_accuracies.append(accuracy)
 
         if accuracy > best_acc:
@@ -73,18 +86,26 @@ def run_experiment(model_class, name, train_loader, test_loader):
 
         if (epoch + 1) % 20 == 0:
             current_lr = optimizer.param_groups[0]['lr']
-            print(f"Epoch [{epoch + 1}/{num_epochs}] - Loss: {avg_loss:.4f} - Acc: {accuracy:.2f}% - LR: {current_lr}")
+            print(
+                f"Epoch [{epoch + 1}/{num_epochs}] - Loss: {avg_loss:.4f} - Acc: {accuracy:.2f}% - LR: {current_lr:.6f}")
+
+    # 3. DETAILED EVALUATION: Final Report & Confusion Matrix
+    print(f"\nFinal Results for {name}:")
+    print_detailed_report(all_labels, all_preds)
 
     plot_training_results(epoch_losses, epoch_accuracies, name)
     print(f"Final Accuracy: {epoch_accuracies[-1]:.2f}% | Best: {best_acc:.2f}%")
 
+
 if __name__ == "__main__":
+    # Ensure your data_loader implements the SeismicTransform (Z-score + Noise)
     train_ld, test_ld = get_dataloaders('data/Earthquakes_TRAIN.tsv', 'data/Earthquakes_TEST.tsv')
 
     models_to_test = [
         (EarthquakeMLP, "MLP"),
         (EarthquakeCNN, "CNN"),
-        (EarthquakeRNN, "RNN")
+        (EarthquakeRNN, "RNN"),
+        (SeismicNet, "Hybrid_SeismicNet")  # Added the professional refactor
     ]
 
     for m_class, name in models_to_test:
