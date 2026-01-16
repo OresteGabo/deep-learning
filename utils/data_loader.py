@@ -2,7 +2,22 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
+import torch
+import numpy as np
 
+class SeismicTransform:
+    def __init__(self, mean=0.0, std=1.0, noise_level=0.01):
+        self.mean = mean
+        self.std = std
+        self.noise_level = noise_level
+
+    def __call__(self, x):
+        # Scaling + Noise
+        x = (x - self.mean) / (self.std + 1e-6)
+        noise = torch.randn_like(x) * self.noise_level
+        return x + noise
+
+# Apply this inside your Dataset class or data loading loop
 def get_dataloaders(train_path, test_path, batch_size=32):
     # Load TSV files [cite: 23]
     train_df = pd.read_csv(train_path, sep='\t', header=None)
