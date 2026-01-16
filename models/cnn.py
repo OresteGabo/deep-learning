@@ -3,6 +3,12 @@ import torch.nn as nn
 
 
 class EarthquakeCNN(nn.Module):
+    """
+    1D Convolutional Neural Network for seismic signal classification.
+
+    The model extracts hierarchical spatial features from raw waveforms using
+    varying kernel sizes, followed by global pooling and a dense classifier.
+    """
     def __init__(self):
         super().__init__()
         self.conv = nn.Sequential(
@@ -31,6 +37,15 @@ class EarthquakeCNN(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Forward pass of the network.
+
+        Args:
+            x (torch.Tensor): Input seismic signals of shape (batch_size, sequence_length).
+
+        Returns:
+            torch.Tensor: Logits for 2 classes of shape (batch_size, 2).
+        """
         x = x.unsqueeze(1)  # From [batch, 512] to [batch, 1, 512]
         x = self.conv(x).squeeze(-1)
         return self.fc(x)
