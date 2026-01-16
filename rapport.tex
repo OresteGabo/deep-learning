@@ -45,14 +45,12 @@
 
 \newcommand{\hr}[1]{\rule{\linewidth}{#1}}
 
-% --- Début du document ---
 \begin{document}
 
 % --- PAGE DE GARDE ---
 \begin{titlepage}
     \begin{center}
         \includegraphics[width=0.4\textwidth]{assets/logo.png}\\[1cm]
-
         \textsc{\Large Université de Haute-Alsace}\\[0.5cm]
         \textsc{\large Faculté des Sciences et Techniques (FST)}\\[0.5cm]
         \textsc{\large Master 2 Informatique et Mobilité}\\[1.5cm]
@@ -60,7 +58,7 @@
         \hr{0.5pt}
         \vspace{0.4cm}
         {\huge \bfseries Projet Final : Apprentissage Profond} \\[0.4cm]
-        {\Large Détection d'événements sismologiques majeurs}
+        {\Large Étude des architectures pour la prédiction d'événements sismologiques majeurs}
         \vspace{0.4cm}
         \hr{0.5pt}
 
@@ -81,9 +79,7 @@
                 Responsable Deep Learning
             \end{flushright}
         \end{minipage}
-
         \vfill
-
         {\large 16 Janvier 2025}
     \end{center}
 \end{titlepage}
@@ -93,92 +89,85 @@
 \newpage
 
 \section{Introduction}
-Ce projet répond à une problématique du centre sismologique : automatiser la détection d'événements majeurs (séismes, éruptions) à partir de séries temporelles de 512 heures. L'objectif est de remplacer l'analyse visuelle chronophage par des modèles de Deep Learning capables de traiter plusieurs relevés par minute, tout en restant compatibles avec des infrastructures matérielles modestes.
+Ce rapport présente une étude comparative d'architectures de réseaux de neurones profonds appliquées à la détection d'événements sismologiques majeurs. Le centre sismologique nécessite une automatisation capable de traiter plusieurs relevés par minute. En utilisant le jeu de données \textit{Earthquakes} (archive UCR), nous analysons des séries temporelles de 512 heures pour distinguer les signaux "normaux" des signes précurseurs d'un séisme.
 
-\section{Architectures et Motivations}
-Nous avons implémenté trois types de réseaux, chacun répondant à une approche différente du signal :
+\section{Méthodologie et Justification des Choix}
+\subsection{Prétraitement et Régularisation}
+La robustesse de l'évaluation repose sur une normalisation \textbf{Z-Score} systématisée pour chaque série temporelle. Cette étape est cruciale car elle permet au réseau de se focaliser sur les variations de fréquences et de formes d'ondes plutôt que sur l'amplitude brute du signal.
+Pour contrer le surapprentissage, nous avons utilisé :
 \begin{itemize}
-    \item \textbf{MLP (Multi-Layer Perceptron) :} Utilisé comme référence pour sa simplicité. Il traite les 512 points comme des variables indépendantes.
-    \item \textbf{CNN (Convolutional Neural Network) :} Conçu pour extraire des motifs locaux (pics sismologiques) grâce à des filtres convolutionnels 1D.
-    \item \textbf{RNN (LSTM) :} Choisi pour sa capacité à mémoriser les dépendances temporelles longues, cruciales pour l'évolution d'un signal sismique sur 512 heures.
+    \item \textbf{Dropout (0.3) :} Utilisé dans le classifieur final pour désactiver aléatoirement des neurones, forçant le modèle à apprendre des représentations redondantes.
+    \item \textbf{Batch Normalization :} Appliquée dans le CNN pour stabiliser le gradient et accélérer la convergence.
+    \item \textbf{Weighted CrossEntropy Loss :} Un poids de 3.0 est attribué à la classe minoritaire pour pallier le déséquilibre (74.8\% de cas normaux).
 \end{itemize}
 
-\section{Analyse Détaillée des Performances}
+\subsection{Optimisation et Reproductibilité}
+Nous utilisons l'optimiseur \textbf{Adam} couplé au scheduler \textbf{OneCycleLR}. Ce dernier est justifié par sa capacité à effectuer une "super-convergence" en faisant varier le taux d'apprentissage de manière cyclique. Pour garantir la reproductibilité, une graine aléatoire fixe (\textit{Seed 42}) a été utilisée, bien que nous observions des variations mineures dues aux opérations non-déterministes de l'accélération matérielle MPS.
 
+\section{Analyse des Architectures}
 \subsection{Multi-Layer Perceptron (MLP)}
-\begin{figure}[H]
-    \centering
-    \begin{minipage}{0.48\textwidth}
-        \centering \includegraphics[width=\textwidth]{assets/MLP_loss.png}
-    \end{minipage}\hfill
-    \begin{minipage}{0.48\textwidth}
-        \centering \includegraphics[width=\textwidth]{assets/MLP_accuracy.png}
-    \end{minipage}
-    \caption{Résultats MLP : Surapprentissage précoce marqué par une chute de la perte mais une instabilité de la précision test.}
-\end{figure}
+Le MLP sert de base de référence (Baseline). Il traite les 512 points comme un vecteur plat.
+\textbf{Analyse des logs :} Avec une perte finale de 0.0001 mais une précision de test stagnante à 69.78\%, le modèle montre un surapprentissage clair. Il mémorise le bruit du train set sans généraliser la structure temporelle.
 
 \subsection{Convolutional Neural Network (CNN)}
-\begin{figure}[H]
-    \centering
-    \begin{minipage}{0.48\textwidth}
-        \centering \includegraphics[width=\textwidth]{assets/CNN_loss.png}
-    \end{minipage}\hfill
-    \begin{minipage}{0.48\textwidth}
-        \centering \includegraphics[width=\textwidth]{assets/CNN_accuracy.png}
-    \end{minipage}
-    \caption{Résultats CNN : Plateau horizontal à 74.82\%, indiquant que le modèle se limite à prédire la classe majoritaire.}
-\end{figure}
+Le CNN utilise des noyaux 1D pour extraire des caractéristiques spatiales locales (pics d'activité).
+\textbf{Analyse des logs :} Bien qu'il atteigne une \textit{Best Accuracy} de 75.54\%, il reste instable. Sa matrice de confusion montre qu'il peine à isoler les séismes réels (Rappel de 0.37).
 
-\subsection{Recurrent Neural Network (RNN)}
-\begin{figure}[H]
-    \centering
-    \begin{minipage}{0.48\textwidth}
-        \centering \includegraphics[width=\textwidth]{assets/RNN_loss.png}
-    \end{minipage}\hfill
-    \begin{minipage}{0.48\textwidth}
-        \centering \includegraphics[width=\textwidth]{assets/RNN_accuracy.png}
-    \end{minipage}
-    \caption{Résultats RNN : Meilleur modèle (76.98\%), capable de surpasser le biais statistique.}
-\end{figure}
+\subsection{Recurrent Neural Network (RNN/LSTM)}
+Le RNN est l'architecture la plus adaptée théoriquement aux séries temporelles grâce à ses cellules à mémoire.
+\textbf{Analyse des logs :} Le RNN s'est révélé être le modèle le plus performant avec une précision record de \textbf{81.29\%} et un score F1 de \textbf{0.54} pour les séismes. Il identifie 21 séismes sur 35, un résultat significatif pour la sécurité sismologique.
 
-\section{Étude de Complexité et Robustesse}
-Conformément aux contraintes du service sismologique, nous avons mesuré l'efficacité de nos modèles.
+\subsection{Modèle Hybride : SeismicNet}
+Fusionnant CNN et Bi-LSTM, ce modèle vise à extraire des motifs locaux avant de les traiter séquentiellement.
+\textbf{Analyse des logs :} Il atteint une précision de 78.42\% et se distingue par son temps d'inférence extrêmement optimisé (0.0045s).
 
-\textbf{Environnement d'exécution :} MacBook Pro M4 (16GB RAM), macOS Tahoe 26.1, accélération MPS (Metal).
+\section{Étude de Complexité et Performance}
+Conformément aux contraintes matérielles du centre sismologique, nous présentons le tableau comparatif suivant, exécuté sur architecture MacBook Pro M4 :
 
 \begin{table}[H]
     \centering
     \begin{tabular}{lcccc}
         \toprule
-        \textbf{Modèle} & \textbf{Paramètres} & \textbf{Inférence (s)} & \textbf{Meilleure Acc.} \\
+        \textbf{Modèle} & \textbf{Paramètres} & \textbf{Inférence (s)} & \textbf{Best Acc.} & \textbf{F1-Séis.} \\
         \midrule
-        MLP & 74,050 & \textbf{0.0014s} & 74.82\% \\
-        CNN & \textbf{43,842} & 0.0092s & 74.82\% \\
-        RNN & 50,562 & 0.0047s & \textbf{76.98\%} \\
+        MLP & 74,050 & 0.0067s & 74.82\% & 0.25 \\
+        CNN & \textbf{43,842} & 0.0088s & 75.54\% & 0.35 \\
+        \textbf{RNN} & 50,562 & 0.0074s & \textbf{81.29\%} & \textbf{0.54} \\
+        SeismicNet & 85,698 & \textbf{0.0045s} & 78.42\% & 0.37 \\
         \bottomrule
     \end{tabular}
-    \caption{Comparaison technique des architectures.}
+    \caption{Comparaison technique des modèles entraînés sur 100 époques.}
 \end{table}
 
-\textbf{Robustesse :} Nous avons intégré un \textit{Learning Rate Scheduler} (\texttt{ReduceLROnPlateau}) et du \textit{Dropout} (0.2/0.3) pour garantir que les performances ne sont pas dues à un simple surapprentissage mais à une réelle généralisation des signaux.
+\section{Discussion sur la Robustesse et Variabilité}
+Il est important de noter que l'entraînement de réseaux profonds est un processus stochastique. Bien que la graine soit fixée, des exécutions répétées peuvent mener à des résultats légèrement différents (variations de $\pm 2\%$). Cette variabilité souligne la nécessité d'une évaluation robuste par matrice de confusion. Par exemple, le RNN présente un équilibre sain entre précision (0.49) et rappel (0.60) pour la classe Earthquake, ce qui est crucial pour minimiser les faux négatifs (séismes non détectés).
 
 \section{Conclusion}
-Le modèle \textbf{RNN (LSTM)} est recommandé pour sa précision supérieure. Bien que plus lent à l'inférence que le MLP, il reste largement sous le seuil d'une seconde, garantissant sa viabilité sur les PCs du service de sismologie.
+Le modèle **RNN** est recommandé pour sa capacité de détection supérieure (Meilleur Score F1). Toutefois, le **SeismicNet** représente l'avenir du déploiement opérationnel grâce à son temps d'inférence record, permettant de traiter des milliers de relevés par minute sur les machines modestes du service.
 
 \newpage
-\section{Annexes : Code Principal}
-\begin{lstlisting}[language=Python, caption=Architecture RNN finale]
-class EarthquakeRNN(nn.Module):
-    def __init__(self):
+\section{Annexes : Code et Implémentation}
+\begin{lstlisting}[language=Python, caption=Architecture du SeismicNet Hybride]
+class SeismicNet(nn.Module):
+    def __init__(self, input_dim=1, hidden_dim=64):
         super().__init__()
-        self.lstm = nn.LSTM(input_size=1, hidden_size=64,
-                            num_layers=2, batch_first=True)
-        self.fc = nn.Linear(64, 2)
+        self.feature_extractor = nn.Sequential(
+            nn.Conv1d(input_dim, 32, kernel_size=7, padding=3),
+            nn.BatchNorm1d(32), nn.ReLU(), nn.MaxPool1d(2),
+            nn.Conv1d(32, 64, kernel_size=5, padding=2),
+            nn.BatchNorm1d(64), nn.ReLU(), nn.MaxPool1d(2)
+        )
+        self.lstm = nn.LSTM(64, hidden_dim, bidirectional=True, batch_first=True)
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_dim * 2, 64), nn.ReLU(),
+            nn.Dropout(0.3), nn.Linear(64, 2)
+        )
 
     def forward(self, x):
-        x = x.unsqueeze(-1)
-        _, (hn, _) = self.lstm(x)
-        return self.fc(hn[-1])
+        x = x.unsqueeze(1)
+        x = self.feature_extractor(x).transpose(1, 2)
+        lstm_out, _ = self.lstm(x)
+        return self.classifier(lstm_out[:, -1, :])
 \end{lstlisting}
 
 \end{document}
